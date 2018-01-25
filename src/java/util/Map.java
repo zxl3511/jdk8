@@ -562,9 +562,10 @@ public interface Map<K,V> {
     // Defaultable methods
 
     /**
+     * 返回匹配的值，如果无匹配值，返回默认值defaultValue
      * Returns the value to which the specified key is mapped, or
      * {@code defaultValue} if this map contains no mapping for the key.
-     *
+     *此接口的默认实现不提供线程安全或原子性保证。如需提供原子性保证的实现必须覆盖此方法
      * @implSpec
      * The default implementation makes no guarantees about synchronization
      * or atomicity properties of this method. Any implementation providing
@@ -591,6 +592,9 @@ public interface Map<K,V> {
     }
 
     /**
+     * 遍历map，并以特定的方式处理其键值对
+     * 遍历entries,并对k，v进行传入的特定actions处理。除非实现类自定义了actions，否则按照entries的顺序逐个处理键值对
+     *
      * Performs the given action for each entry in this map until all entries
      * have been processed or the action throws an exception.   Unless
      * otherwise specified by the implementing class, actions are performed in
@@ -632,6 +636,7 @@ public interface Map<K,V> {
     }
 
     /**
+     * 用函数运行结果替换entry的原始value值
      * Replaces each entry's value with the result of invoking the given
      * function on that entry until all entries have been processed or the
      * function throws an exception.  Exceptions thrown by the function are
@@ -696,6 +701,7 @@ public interface Map<K,V> {
     }
 
     /**
+     * 如果指定key无关联的value或关联的value为null，则将传入的value与key关联，并返回此value；否则直接返回关联值
      * If the specified key is not already associated with a value (or is mapped
      * to {@code null}) associates it with the given value and returns
      * {@code null}, else returns the current value.
@@ -748,6 +754,7 @@ public interface Map<K,V> {
     }
 
     /**
+     * 移除指定key对应的键值对（仅当key对应的值与传入的value相同时）
      * Removes the entry for the specified key only if it is currently
      * mapped to the specified value.
      *
@@ -783,6 +790,9 @@ public interface Map<K,V> {
      */
     default boolean remove(Object key, Object value) {
         Object curValue = get(key);
+        //1.curValue和value的equals不成立，
+        //2.curValue为null(key不存在或key对应的值为null)且map不包含key
+        //第二个条件，如果没有!containsKey(key)，那么，假如map有个键值对为key=null，而传入的value!=null，那此键值对永远无法删除
         if (!Objects.equals(curValue, value) ||
             (curValue == null && !containsKey(key))) {
             return false;
@@ -792,6 +802,7 @@ public interface Map<K,V> {
     }
 
     /**
+     *  以newValue替换指定key对应的键值对（仅当key对应的值与传入的oldValue相同时）
      * Replaces the entry for the specified key only if currently
      * mapped to the specified value.
      *
@@ -835,6 +846,9 @@ public interface Map<K,V> {
      */
     default boolean replace(K key, V oldValue, V newValue) {
         Object curValue = get(key);
+        //1.curValue和oldValue的equals不成立，
+        //2.curValue为null(key不存在或key对应的值为null)且map不包含key
+        //第二个条件，如果没有!containsKey(key)，那么，假如map有个键值对为key=null，而传入的oldValue!=null，将无法替换该键值对
         if (!Objects.equals(curValue, oldValue) ||
             (curValue == null && !containsKey(key))) {
             return false;
@@ -844,6 +858,7 @@ public interface Map<K,V> {
     }
 
     /**
+     * 将key的关联值替换为指定value，并返回key替换前的关联值。当key不存在时，返回null
      * Replaces the entry for the specified key only if it is
      * currently mapped to some value.
      *
@@ -883,6 +898,8 @@ public interface Map<K,V> {
      */
     default V replace(K key, V value) {
         V curValue;
+        //有点疑惑，如果containsKey条件为假，则((curValue = get(key)) != null)一定也为假，
+        //感觉((curValue = get(key)) != null)这个条件仅仅是为了给curValue赋值，且保证变量的最小作用域
         if (((curValue = get(key)) != null) || containsKey(key)) {
             curValue = put(key, value);
         }
@@ -890,6 +907,7 @@ public interface Map<K,V> {
     }
 
     /**
+     * 如果key不存在关联值，对key进行指定的函数运算，并把运算结果设置到map中
      * If the specified key is not already associated with a value (or is mapped
      * to {@code null}), attempts to compute its value using the given mapping
      * function and enters it into this map unless {@code null}.
@@ -964,6 +982,8 @@ public interface Map<K,V> {
     }
 
     /**
+     * 如果给定key的关联值已经存在且非null，通过指定函数运算，
+     * 如果结果为null，则从map中移除该key，如果不为null，将运算结果更新为key的新关联值，并返回计算后的结果
      * If the value for the specified key is present and non-null, attempts to
      * compute a new mapping given the key and its current mapped value.
      *
@@ -1091,6 +1111,7 @@ public interface Map<K,V> {
         V oldValue = get(key);
 
         V newValue = remappingFunction.apply(key, oldValue);
+        //计算后的新值为空，如果key存在且value不为null，将改key-value对移除
         if (newValue == null) {
             // delete mapping
             if (oldValue != null || containsKey(key)) {
@@ -1102,6 +1123,7 @@ public interface Map<K,V> {
                 return null;
             }
         } else {
+        	//计算后的新值不为空，用新值替换老值
             // add or replace old mapping
             put(key, newValue);
             return newValue;
@@ -1109,6 +1131,9 @@ public interface Map<K,V> {
     }
 
     /**
+     * 如果给定的key没有关联值或关联的是null值，则将此key与传入的非空value关联
+     * 如果key已经有关联值，则通过传入的函数进行计算。
+     * 如果计算结果不为null，则更新key的关联值为此结果，否则移除该key
      * If the specified key is not already associated with a value or is
      * associated with null, associates it with the given non-null value.
      * Otherwise, replaces the associated value with the results of the given
@@ -1171,6 +1196,7 @@ public interface Map<K,V> {
         Objects.requireNonNull(remappingFunction);
         Objects.requireNonNull(value);
         V oldValue = get(key);
+        //如果key关联的value不为null，则通过传入的函数进行计算，并赋值给newValue
         V newValue = (oldValue == null) ? value :
                    remappingFunction.apply(oldValue, value);
         if(newValue == null) {
